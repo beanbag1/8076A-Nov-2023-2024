@@ -9,9 +9,18 @@ Motor R3 (2, E_MOTOR_GEAR_BLUE, true);
 
 Motor_Group drive ({L1, L2, L3, R1, R2, R3});
 
+double sgn(double in) {
+    return in/fabs(in);
+}
+
 double abscap(double a, double b) {
     if (a > b) return b;
     else if (a < -b) return -b;
+    else return a;
+}
+
+double absfloor(double a, double b) {
+    if (fabs(a) < b) return sgn(a) * b; 
     else return a;
 }
 
@@ -33,10 +42,10 @@ double getEncdR() {
 
 IMU inertial (19);
 
-#define kPstraight 0.12
-#define kDstraight 0.1
-#define kPturn 1.3
-#define kDturn 0
+double kPstraight = 0.15;
+double kDstraight = 0.1;
+double kPturn = 0.7;
+double kDturn = 0;
 #define slewPow 2.5
 #define inchesPerDeg 0.02399827721/1.2
 
@@ -64,6 +73,11 @@ void setMaxRPM(double max) {
     maxV = max/600*127;
 }
 
+void setTurnConstants(double kp, double kd) {
+    kPturn = kp;
+    kDturn = kd;
+}
+
 void baseMove(double dist) {
     turning = false;
     targEncdL += dist/inchesPerDeg;
@@ -79,7 +93,7 @@ void baseTurn(double bearing) {
 
 void waitMove(double cutoff) {
     double start = millis();
-    while (((fabs(errorEncdL) > 15) || (fabs(errorEncdR) > 15)) && millis() < (start + cutoff)) {
+    while (((fabs(errorEncdL) > 30) || (fabs(errorEncdR) > 30)) && millis() < (start + cutoff)) {
         delay(10);
     }
     drive.tare_position();
@@ -90,7 +104,7 @@ void waitMove(double cutoff) {
 
 void waitTurn(double cutoff) {
     double start = millis();
-    while ((errorBearing > 1) && millis() < (start + cutoff)) {
+    while ((fabs(errorBearing) > 1) && millis() < (start + cutoff)) {
         delay(10);
     }
     drive.tare_position();
@@ -105,7 +119,8 @@ void baseControl(void* ignore) {
     double targL = 0, targR = 0;
     while (competition::is_autonomous()) {
         if (turning) {
-            errorBearing = targBearing - inertial.get_rotation();
+            double currentBearing = inertial.is_calibrating() ? 0 : inertial.get_rotation();
+            errorBearing = targBearing - currentBearing;
             targL = errorBearing * kPturn + (errorBearing - perrorBearing) * kDturn;
             targR = -targL;
             perrorBearing = errorBearing;

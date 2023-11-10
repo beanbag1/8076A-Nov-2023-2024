@@ -1,14 +1,14 @@
 #include "main.h"
 
 #define catakP 0.08
-#define cataThreshold 500
+#define cataThreshold 800
 
 cataControlType cataControlState = automatic;
 
 double cataTarg = 0;
 bool firing = false;
 bool cataDown = false;
-double cataMin = 50;
+double cataMin = 55;
 
 void cataControl(void *ignore) {
     Motor cata (12, E_MOTOR_GEAR_RED, true);
@@ -21,17 +21,17 @@ void cataControl(void *ignore) {
         cataCurr = cataRot.get_angle();
         if (cataCurr >= cataTarg) {
             error = cataCurr - cataTarg;
-            error = abs(error) + 100;
+            error = abs(error) + 0;
         } else if (cataCurr < cataTarg) {
             error = cataCurr - cataTarg + 36000;
-            error = abs(error) + 100;
+            error = abs(error) + 0;
         }
 
         if (error < cataThreshold) {
             cataDown = true;
         }
 
-        if ((cata.get_actual_velocity() < 5) && !cataDown) {
+        if ((cata.get_actual_velocity() < 20) && !cataDown) {
             cataMin += 0.2;
         } // to help stalls
 
@@ -47,7 +47,7 @@ void cataControl(void *ignore) {
             delay(500);
             firing = false;
             cataDown = false;
-            if (cataControlState == automatic) cataMin = 65;
+            if (cataControlState == automatic) cataMin = 55;
             else cataMin = 10;
         }
         delay(10);
@@ -72,14 +72,14 @@ bool cataReady() {
 void setCataControlState(cataControlType state) {
     cataControlState = state;
     if (state == automatic) {
-        cataMin = 65;
+        cataMin = 55;
         setCataTarg(0);
     } else if (state == climb) {
         cataMin = 10;
-        setCataTarg(10500);
+        setCataTarg(9000);
     } else if (state == score) {
         cataMin = 10;
-        setCataTarg(5000);
+        setCataTarg(2000);
     }
 }
 

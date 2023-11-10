@@ -15,6 +15,8 @@ void controllerControl(void *ignore) {
 	}
 }
 
+int autoNum = 1;
+
 /**
  * Runs initialization code. This occurs as soon as the program is started.
  *
@@ -27,6 +29,8 @@ void initialize() {
 	Task controllerTask(controllerControl);
 	IMU inertial (19);
 	inertial.reset(true);
+
+	lcd::initialize();
 }
 
 /**
@@ -45,7 +49,47 @@ void disabled() {}
  * This task will exit when the robot is enabled and autonomous or opcontrol
  * starts.
  */
-void competition_initialize() {}
+
+void addAutoNum(){
+	autoNum++;
+	if (autoNum > 3) autoNum = 1;
+}
+
+void minusAutoNum() {
+	autoNum--;
+	if (autoNum < 1) autoNum = 3;
+}
+
+void calibInertial() {
+	IMU inertial (19);
+	inertial.reset(true);
+}
+
+void competition_initialize() {
+	IMU inertial (19);
+	std::string autoName;
+	while(true) {
+		lcd::register_btn0_cb(minusAutoNum);
+		lcd::register_btn1_cb(addAutoNum);
+		lcd::register_btn2_cb(calibInertial);
+		switch (autoNum) {
+			case 1:
+			autoName = "near awp";
+			break;
+
+			case 2: 
+			autoName = "near rush";
+			break;
+
+			case 3:
+			autoName = "far safe";
+			break;
+		}
+		lcd::print(0, "auton: %s", autoName);
+		lcd::print(5, "rotation: %3f", inertial.is_calibrating() ? 0 : inertial.get_rotation());
+		delay(10);
+	}
+}
 
 /**
  * Runs the user autonomous code. This function will be started in its own task
@@ -59,8 +103,22 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
+	double start = millis();
 	Task baseTask (baseControl);
-	farSafe();
+	switch (autoNum) {
+		case 1:
+		nearAWP();
+		break;
+
+		case 2: 
+		nearDeny();
+		break;
+
+		case 3:
+		farSafe();
+		break;
+	}
+	lcd::print(7, "Time elapsed: %3f", ((millis() - start)/1000));
 }
 
 /**
@@ -84,10 +142,13 @@ void opcontrol() {
 	Motor R1 (4, E_MOTOR_GEAR_BLUE, true);
 	Motor R2 (3, E_MOTOR_GEAR_BLUE, true);
 	Motor R3 (2, E_MOTOR_GEAR_BLUE, true);
+	Motor_Group drive ({L1, L2, L3, R1, R2, R3});
+	drive.set_brake_modes(MOTOR_BRAKE_BRAKE);
 
 	Motor intake(13, false);
 
 	int currentCataState = 1;
+	setCataControlState(automatic);
 	#define left_curve_scale 6
 	bool currWingState = false;
 
@@ -103,7 +164,8 @@ void opcontrol() {
 		R3.move(throttle - yaw);
 
 		if (master.get_digital(DIGITAL_L1)) {
-			intake.move(127);
+			if (currentCataState == 2) intake.move(90);
+			else intake.move(127);
 		} else if (master.get_digital(DIGITAL_L2)) {
 			intake.move(-127);
 		} else intake.move(20);
